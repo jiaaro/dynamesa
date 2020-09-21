@@ -14,6 +14,8 @@ class Table:
         """
         Takes a table and a dictionary of updates, extracts the primary key from the
         update dict and applies the remaining keys as an update to the record.
+        
+        Pass return_values="NONE" if you don't care what the resulting record is.
         """
         table = self.table
         update = update.copy()
