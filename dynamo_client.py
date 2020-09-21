@@ -6,11 +6,11 @@ class Table:
         dynamodb = boto3.resource("dynamodb", **kwargs)
         self.table = dynamodb.Table(table_name)
         
-    def put_item(self, item):
+    def put(self, item):
         self.table.put_item(Item=item)
         return item
 
-    def update_item(self, update, return_values="ALL_NEW"):
+    def update(self, update, return_values="ALL_NEW"):
         """
         Takes a table and a dictionary of updates, extracts the primary key from the
         update dict and applies the remaining keys as an update to the record.
