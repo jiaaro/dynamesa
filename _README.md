@@ -8,9 +8,9 @@ Example use:
 from dynamo_client import Table, REMOVE_KEY
 
 table = Table("myapp-users")
-table.put_item({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
+table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
 
-updated_item = table.update_item({
+updated_item = table.update({
   "id": 1,
   "email": "jfrost@northpole.io",
   "age": REMOVE_KEY
