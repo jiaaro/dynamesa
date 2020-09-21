@@ -8,6 +8,7 @@ class Table:
 		
 	def put_item(self, item):
 		self.table.put_item(Item=item)
+		return item
 
 	def update_item(self, update, return_values="ALL_NEW"):
 		"""
