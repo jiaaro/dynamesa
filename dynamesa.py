@@ -15,6 +15,9 @@ class Table:
         dynamodb = boto3.resource("dynamodb", **kwargs)
         self.table = dynamodb.Table(table_name)
 
+    def __repr__(self):
+        return f"<Table: {self.table.name}>"
+
     def put(self, item):
         self.table.put_item(Item=item)
         return item
@@ -115,13 +118,24 @@ class _TableGetter:
     def configure(self, **kwargs):
         self._resource_kwargs.update(kwargs)
 
+    def reload(self):
+        dynamodb = boto3.resource("dynamodb", **self._resource_kwargs)
+        res = dynamodb.meta.client.list_tables()
+        for tablename in res["TableNames"]:
+            self._tables[tablename] = Table(tablename, **self._resource_kwargs)
+
     def __getattr__(self, item):
+        return self[item]
+
+    def __getitem__(self, item):
         if item not in self._tables:
-            dynamodb = boto3.resource("dynamodb", **self._resource_kwargs)
-            res = dynamodb.meta.client.list_tables()
-            for tablename in res["TableNames"]:
-                self._tables[tablename] = Table(tablename, **self._resource_kwargs)
+            self.reload()
         return self._tables[item]
+
+    def __iter__(self):
+        if not self._tables:
+            self.reload()
+        return iter(self._tables.values())
 
 
 tables = _TableGetter()
