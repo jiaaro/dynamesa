@@ -1,8 +1,9 @@
-# for easy access
 import functools
 import operator
 
 import boto3
+
+# for easy access
 from boto3.dynamodb.conditions import Key, Attr
 
 # sentinal value
