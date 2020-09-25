@@ -18,6 +18,12 @@ updated_item = table.update({
 
 # updated_item == {"id": 1, "name": "Jack Frost", "email": "jfrost@northpole.io"}
 
+# returns iterator, uses primary key index
+table.find(id=1)
+
+# will scan (returns iterator)
+table.find(email="jfrost@northpole.io")
+
 # delete everything
 table.clear()
 ```
