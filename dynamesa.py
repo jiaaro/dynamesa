@@ -10,10 +10,15 @@ from boto3.dynamodb.conditions import Key, Attr
 REMOVE_KEY = object()
 
 
+class DoesNotExist(Exception):
+    pass
+
+
 class Table:
     def __init__(self, table_name, **kwargs):
         dynamodb = boto3.resource("dynamodb", **kwargs)
         self.table = dynamodb.Table(table_name)
+        self.DoesNotExist = type("DoesNotExist", (DoesNotExist,), {})
 
     def __repr__(self):
         return f"<Table: {self.table.name}>"
@@ -32,7 +37,7 @@ class Table:
         if unexpected_kwargs:
             raise ValueError(f"table.get recieved unexpected keyword arguments: {unexpected_kwargs!r}")
 
-        return self.table.get_item(Key=dynamo_key)
+        return self.table.get_item(Key=dynamo_key).get("Item")
 
     def put(self, item):
         self.table.put_item(Item=item)
