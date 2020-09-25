@@ -16,8 +16,8 @@ table = dynamesa.tables.MyAppUsers
 # allows for weird table names
 table = dynamesa.tables["My-App-Users"]
 
-# You can also instantiate a table yourself
-table = dynamesa.Table("myapp-users")
+# You can also instantiate a table yourself (requires it's own configuration)
+table = dynamesa.Table("myapp-users", region_name="us-east-1")
 
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
 
