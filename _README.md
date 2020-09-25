@@ -1,6 +1,6 @@
 # A Simple DynamoDB client
 
-The main idea here is to make the simplest operations simple and smooth over boto3's quirks. Mesa
+The main idea here is to make the simplest operations simple and smooth over boto3's quirks.
 
 Example use:
 
