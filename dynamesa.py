@@ -98,17 +98,10 @@ class Table:
             for item in page["Items"]:
                 yield item
 
-    def clear(self, **paginate_kwargs):
-        client = self.table.meta.client
-        if "IndexName" in paginate_kwargs:
-            paginator = client.get_paginator("query").paginate(TableName=self.table.name, **paginate_kwargs)
-        else:
-            paginator = client.get_paginator("scan").paginate(TableName=self.table.name, **paginate_kwargs)
-
+    def clear(self, *args, **kwargs):
         with self.table.batch_writer() as batch:
-            for page in paginator:
-                for item in page["Items"]:
-                    batch.delete_item(Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema})
+            for item in self.find(*args, **kwargs):
+                batch.delete_item(Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema})
 
 
 class _TableGetter:
