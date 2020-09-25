@@ -76,17 +76,23 @@ class Table:
         return res.get("Attributes")
 
     def find(self, dynamo_table_index_name_=None, **kwargs):
-        conditions = None
-        if kwargs:
-            conditions = functools.reduce(operator.and_, [Key(k).eq(v) for k, v in kwargs.items()])
-
         paginate_kwargs = {}
         if dynamo_table_index_name_:
             paginate_kwargs["IndexName"] = dynamo_table_index_name_
-            if conditions:
-                paginate_kwargs["KeyConditionExpression"] = conditions
-        elif conditions:
-            paginate_kwargs["FilterExpression"] = conditions
+            idx = next(
+                idx for idx in self.table.global_secondary_indexes if idx["IndexName"] == dynamo_table_index_name_
+            )
+            idx_keys = {a["AttributeName"] for a in idx["KeySchema"]}
+            paginate_kwargs["KeyConditionExpression"] = functools.reduce(
+                operator.and_, [Key(k).eq(kwargs[k]) for k in idx_keys]
+            )
+            paginate_kwargs["FilterExpression"] = functools.reduce(
+                operator.and_, [Key(k).eq(v) for k, v in kwargs.items() if k not in idx_keys]
+            )
+        elif kwargs:
+            paginate_kwargs["FilterExpression"] = functools.reduce(
+                operator.and_, [Key(k).eq(v) for k, v in kwargs.items()]
+            )
 
         client = self.table.meta.client
         if "IndexName" in paginate_kwargs:
