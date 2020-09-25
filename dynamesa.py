@@ -86,9 +86,9 @@ class Table:
             paginate_kwargs["KeyConditionExpression"] = functools.reduce(
                 operator.and_, [Key(k).eq(kwargs[k]) for k in idx_keys]
             )
-            paginate_kwargs["FilterExpression"] = functools.reduce(
-                operator.and_, [Key(k).eq(v) for k, v in kwargs.items() if k not in idx_keys]
-            )
+            filters = [Key(k).eq(v) for k, v in kwargs.items() if k not in idx_keys]
+            if filters:
+                paginate_kwargs["FilterExpression"] = functools.reduce(operator.and_, filters)
         elif kwargs:
             paginate_kwargs["FilterExpression"] = functools.reduce(
                 operator.and_, [Key(k).eq(v) for k, v in kwargs.items()]
