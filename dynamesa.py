@@ -75,9 +75,7 @@ class Table:
     def find(self, dynamo_table_index_name_=None, **kwargs):
         conditions = None
         if kwargs:
-            conditions = functools.reduce(operator.and_, [
-                Key(k).eq(v) for k, v in kwargs.items()
-            ])
+            conditions = functools.reduce(operator.and_, [Key(k).eq(v) for k, v in kwargs.items()])
 
         paginate_kwargs = {}
         if dynamo_table_index_name_:
@@ -107,6 +105,24 @@ class Table:
         with self.table.batch_writer() as batch:
             for page in paginator:
                 for item in page["Items"]:
-                    batch.delete_item(
-                        Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema}
-                    )
+                    batch.delete_item(Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema})
+
+
+class _TableGetter:
+    _resource_kwargs = {}
+    _tables = {}
+
+    def configure(self, **kwargs):
+        self._resource_kwargs.update(kwargs)
+
+    def __getattr__(self, item):
+        if item not in self._tables:
+            dynamodb = boto3.resource("dynamodb", **self._resource_kwargs)
+            res = dynamodb.meta.client.list_tables()
+            for tablename in res["TableNames"]:
+                self._tables[tablename] = Table(tablename, **self._resource_kwargs)
+        return self._tables[item]
+
+
+tables = _TableGetter()
+configure = tables.configure

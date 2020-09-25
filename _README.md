@@ -5,15 +5,23 @@ The main idea here is to make the simplest operations simple and smooth over bot
 Example use:
 
 ```python
-from dynamesa import Table, REMOVE_KEY
+import dynamesa
 
-table = Table("myapp-users")
+# boto3 resource kwargs
+dynamesa.configure(region_name="us-east-1")
+
+# Finds tables automatically
+table = dynamesa.tables.MyAppUsers
+
+# You can also instantiate a table yourself
+table = dynamesa.Table("myapp-users")
+
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
 
 updated_item = table.update({
   "id": 1,
   "email": "jfrost@northpole.io",
-  "age": REMOVE_KEY
+  "age": dynamesa.REMOVE_KEY
 })
 
 # updated_item == {"id": 1, "name": "Jack Frost", "email": "jfrost@northpole.io"}
