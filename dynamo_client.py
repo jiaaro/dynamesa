@@ -64,15 +64,15 @@ class Table:
         return res.get("Attributes")
     
     def clear(self, **paginate_kwargs):
-    	client = self.table.meta.client
-		if "IndexName" in paginate_kwargs:
-			paginator = client.get_paginator("query").paginate(TableName=self.table.name, **paginate_kwargs)
-		else:
-			paginator = client.get_paginator("scan").paginate(TableName=self.table.name, **paginate_kwargs)
+        client = self.table.meta.client
+        if "IndexName" in paginate_kwargs:
+            paginator = client.get_paginator("query").paginate(TableName=self.table.name, **paginate_kwargs)
+        else:
+            paginator = client.get_paginator("scan").paginate(TableName=self.table.name, **paginate_kwargs)
 
-		with self.table.batch_writer() as batch:
-			for page in paginator:
-				for item in page["Items"]:
-					batch.delete_item(
-						Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema}
-					)
+        with self.table.batch_writer() as batch:
+            for page in paginator:
+                for item in page["Items"]:
+                    batch.delete_item(
+                        Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema}
+                    )
