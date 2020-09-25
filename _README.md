@@ -13,6 +13,9 @@ dynamesa.configure(region_name="us-east-1")
 # Finds tables automatically
 table = dynamesa.tables.MyAppUsers
 
+# allows for weird table names
+table = dynamesa.tables["My-App-Users"]
+
 # You can also instantiate a table yourself
 table = dynamesa.Table("myapp-users")
 
