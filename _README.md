@@ -1,11 +1,11 @@
-# Simple DynamoDB client
+# A Simple DynamoDB client
 
-The main idea here is to make the simplest operations simple and smooth over boto3's quirks.
+The main idea here is to make the simplest operations simple and smooth over boto3's quirks. Mesa
 
 Example use:
 
 ```python
-from dynamo_client import Table, REMOVE_KEY
+from dynamesa import Table, REMOVE_KEY
 
 table = Table("myapp-users")
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
