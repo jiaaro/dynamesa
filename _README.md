@@ -20,6 +20,7 @@ table = dynamesa.tables["My-App-Users"]
 table = dynamesa.Table("myapp-users", region_name="us-east-1")
 
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
+table.get(id=1)
 
 updated_item = table.update({
   "id": 1,
