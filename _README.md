@@ -17,4 +17,7 @@ updated_item = table.update({
 })
 
 # updated_item == {"id": 1, "name": "Jack Frost", "email": "jfrost@northpole.io"}
+
+# delete everything
+table.clear()
 ```
