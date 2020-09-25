@@ -29,8 +29,8 @@ updated_item = table.update({
 
 # updated_item == {"id": 1, "name": "Jack Frost", "email": "jfrost@northpole.io"}
 
-# returns iterator, uses an index
-table.find("UserAgeIndex", age="25")
+# returns iterator, uses an index, name isn't in the index so also uses a filter expression
+table.find("UserAgeIndex", age="74", name="King Cole")
 
 # will scan (returns iterator)
 table.find(email="jfrost@northpole.io")
