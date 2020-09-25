@@ -1,11 +1,19 @@
+# for easy access
+import functools
+import operator
+
+import boto3
+from boto3.dynamodb.conditions import Key, Attr
+
 # sentinal value
 REMOVE_KEY = object()
+
 
 class Table:
     def __init__(self, table_name, **kwargs):
         dynamodb = boto3.resource("dynamodb", **kwargs)
         self.table = dynamodb.Table(table_name)
-        
+
     def put(self, item):
         self.table.put_item(Item=item)
         return item
@@ -14,7 +22,7 @@ class Table:
         """
         Takes a table and a dictionary of updates, extracts the primary key from the
         update dict and applies the remaining keys as an update to the record.
-        
+
         Pass return_values="NONE" if you don't care what the resulting record is.
         """
         table = self.table
@@ -62,7 +70,32 @@ class Table:
             **kwargs,
         )
         return res.get("Attributes")
-    
+
+    def find(self, dynamo_table_index_name_=None, **kwargs):
+        conditions = None
+        if kwargs:
+            conditions = functools.reduce(operator.and_, [
+                Key(k).eq(v) for k, v in kwargs.items()
+            ])
+
+        paginate_kwargs = {}
+        if dynamo_table_index_name_:
+            paginate_kwargs["IndexName"] = dynamo_table_index_name_
+            if conditions:
+                paginate_kwargs["KeyConditionExpression"] = conditions
+        elif conditions:
+            paginate_kwargs["FilterExpression"] = conditions
+
+        client = self.table.meta.client
+        if "IndexName" in paginate_kwargs:
+            paginator = client.get_paginator("query").paginate(TableName=self.table.name, **paginate_kwargs)
+        else:
+            paginator = client.get_paginator("scan").paginate(TableName=self.table.name, **paginate_kwargs)
+
+        for page in paginator:
+            for item in page["Items"]:
+                yield item
+
     def clear(self, **paginate_kwargs):
         client = self.table.meta.client
         if "IndexName" in paginate_kwargs:
