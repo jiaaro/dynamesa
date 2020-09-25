@@ -18,6 +18,22 @@ class Table:
     def __repr__(self):
         return f"<Table: {self.table.name}>"
 
+    def get(self, **kwargs):
+        dynamo_key = {}
+        for k in self.table.key_schema:
+            if k not in kwargs:
+                raise ValueError(
+                    f"table.get was missing {k['KeyType']} key, {k['AttributeName']} for table {self.table.name}"
+                )
+            else:
+                dynamo_key[k["AttributeName"]] = kwargs[k["AttributeName"]]
+
+        unexpected_kwargs = set(kwargs.keys()) - set(dynamo_key.keys())
+        if unexpected_kwargs:
+            raise ValueError(f"table.get recieved unexpected keyword arguments: {unexpected_kwargs!r}")
+
+        return self.table.get_item(Key=dynamo_key)
+
     def put(self, item):
         self.table.put_item(Item=item)
         return item
