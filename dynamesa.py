@@ -26,7 +26,7 @@ class Table:
     def get(self, **kwargs):
         dynamo_key = {}
         for k in self.table.key_schema:
-            if k not in kwargs:
+            if k["AttributeName"] not in kwargs:
                 raise ValueError(
                     f"table.get was missing {k['KeyType']} key, {k['AttributeName']} for table {self.table.name}"
                 )
