@@ -18,7 +18,7 @@ class Table:
     def __init__(self, table_name, **kwargs):
         dynamodb = boto3.resource("dynamodb", **kwargs)
         self.table = dynamodb.Table(table_name)
-        self.DoesNotExist = type("DoesNotExist", (DoesNotExist,), {})
+        self.DoesNotExist = type(f"DoesNotExist", (DoesNotExist,), {})
 
     def __repr__(self):
         return f"<Table: {self.table.name}>"
@@ -36,8 +36,10 @@ class Table:
         unexpected_kwargs = set(kwargs.keys()) - set(dynamo_key.keys())
         if unexpected_kwargs:
             raise ValueError(f"table.get recieved unexpected keyword arguments: {unexpected_kwargs!r}")
-
-        return self.table.get_item(Key=dynamo_key).get("Item")
+        item = self.table.get_item(Key=dynamo_key).get("Item")
+        if not item:
+            raise self.DoesNotExist(dynamo_key)
+        return item
 
     def put(self, item):
         self.table.put_item(Item=item)
