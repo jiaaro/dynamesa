@@ -1,6 +1,6 @@
 # A Simple DynamoDB client
 
-Makes the simplest operations simple, and smooth over boto3's quirks.
+Makes the simplest operations simple, and smoothes over boto3's quirks.
 
 Example use:
 
