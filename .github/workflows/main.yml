@@ -12,9 +12,9 @@ jobs:
       dynamo:
         image: amazon/dynamodb-local
         ports:
-          - "2808:8000"
+          - "8000:8000"
     env:
-      DYNAMO_ENDPOINT: "http://dynamo:2808"
+      DYNAMO_ENDPOINT: "http://dynamo:8000"
 
     steps:
     - uses: actions/checkout@v2
