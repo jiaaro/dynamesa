@@ -1,5 +1,4 @@
 import os
-import time
 import unittest
 import subprocess
 import dynamesa
@@ -10,7 +9,7 @@ class DynamoTests(unittest.TestCase):
     def setUp(self) -> None:
         dynamesa.configure(
             region_name="localhost",
-            endpoint_url="http://127.0.0.1:2808",
+            endpoint_url=os.environ.get("DYNAMO_ENDPOINT", "http://127.0.0.1:2808"),
             aws_access_key_id="AKLOCAL",
             aws_secret_access_key="SKLOCAL",
         )
