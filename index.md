@@ -1,4 +1,4 @@
-# Dynamesa
+# [Dynamesa](https://github.com/jiaaro/dynamesa)
 
 ## A Simple DynamoDB client
 
