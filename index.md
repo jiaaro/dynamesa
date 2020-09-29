@@ -1,37 +1,47 @@
-## Welcome to GitHub Pages
+## A Simple DynamoDB client
 
-You can use the [editor on GitHub](https://github.com/jiaaro/dynamesa/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+Makes the simplest operations simple, and smoothes over boto3's quirks.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+### Sample code
 
-### Markdown
+```python
+import dynamesa
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+# boto3 resource kwargs
+dynamesa.configure(region_name="us-east-1")
 
-```markdown
-Syntax highlighted code block
+# Finds tables automatically
+table = dynamesa.tables.MyAppUsers
 
-# Header 1
-## Header 2
-### Header 3
+# allows for weird table names
+table = dynamesa.tables["My-App-Users"]
 
-- Bulleted
-- List
+# You can also instantiate a table yourself (requires it's own configuration)
+table = dynamesa.Table("myapp-users", region_name="us-east-1")
 
-1. Numbered
-2. List
+table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
+table.get(id=1)
 
-**Bold** and _Italic_ and `Code` text
+updated_item = table.update({
+  "id": 1,
+  "email": "jfrost@northpole.io",
+  "age": dynamesa.REMOVE_KEY
+})
 
-[Link](url) and ![Image](src)
+# updated_item == {"id": 1, "name": "Jack Frost", "email": "jfrost@northpole.io"}
+
+# returns iterator, uses an index, name isn't in the index so also uses a filter expression
+table.find("UserAgeIndex", age="74", name="King Cole")
+
+# Use the primary key index
+table.find(dynamesa.PRIMARY_KEY, id=1)
+
+# Query or scan using boto3 Key expressions 
+table.find(dynamesa.PRIMARY_KEY, dynamesa.Key("id").eq(1))
+
+# will scan (returns iterator)
+table.find(email="jfrost@northpole.io")
+
+# delete everything
+table.clear()
 ```
-
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
-
-### Jekyll Themes
-
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/jiaaro/dynamesa/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
-
-### Support or Contact
-
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://github.com/contact) and we’ll help you sort it out.
