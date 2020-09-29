@@ -4,6 +4,14 @@
 
 Makes the simplest operations simple, and smoothes over boto3's quirks.
 
+### Install
+
+For now install from the repo. If `boto3` isn't already available in your python environment, you'll need that too.
+
+```bash
+pip install -U git+https://github.com/jiaaro/dynamesa.git#egg=dynamesa
+```
+
 ### Sample code
 
 ```python
