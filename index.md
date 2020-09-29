@@ -4,7 +4,7 @@
 
 Makes the simplest operations simple, and smoothes over boto3's quirks.
 
-### Install
+### Installing Dynamesa
 
 For now install from the repo. If `boto3` isn't already available in your python environment, you'll need that too.
 
