@@ -1,3 +1,5 @@
+# Dynamesa
+
 ## A Simple DynamoDB client
 
 Makes the simplest operations simple, and smoothes over boto3's quirks.
