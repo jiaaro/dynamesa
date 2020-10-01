@@ -2,7 +2,7 @@
 
 Makes the simplest operations simple, and smoothes over boto3's quirks.
 
-Example use:
+Finding tables:
 
 ```python
 import dynamesa
@@ -18,6 +18,17 @@ table = dynamesa.tables["My-App-Users"]
 
 # You can also instantiate a table yourself (requires it's own configuration)
 table = dynamesa.Table("myapp-users", region_name="us-east-1")
+```
+
+Example use:
+```python
+import dynamesa
+
+table = dynamesa.tables.create(
+    "User",
+    ("id", "S", "ts", "N"),
+    gsis={"AgeIndex": ("age", "N")},
+)
 
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
 table.get(id=1)
