@@ -26,6 +26,9 @@ class Table:
     def __repr__(self):
         return f"<Table: {self.table.name}>"
 
+    def __str__(self):
+        return f"{self.table.name} ({self.table.creation_date_time:%Y-%m-%d}, {self.table.item_count} items)"
+
     def get(self, **kwargs):
         dynamo_key = {}
         for k in self.table.key_schema:
@@ -232,6 +235,13 @@ class _TableGetter:
         if not self._tables:
             self.reload()
         return iter(self._tables.values())
+
+    def __repr__(self):
+        max_table_name_len = max(len(t.table.name) for t in self)
+        return "Dynamesa Tables:\n" + "\n".join(
+            f"  {t.table.name.ljust(max_table_name_len)}  ({t.table.creation_date_time:%Y-%m-%d}, {t.table.item_count} items)"
+            for t in self
+        )
 
 
 tables = _TableGetter()
