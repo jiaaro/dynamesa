@@ -1,7 +1,8 @@
+import dataclasses
 import functools
 import operator
 from itertools import zip_longest
-from typing import Iterator
+import typing as ty
 
 import boto3
 
@@ -9,17 +10,47 @@ import boto3
 from boto3.dynamodb.conditions import Key, Attr
 
 # sentinal values
-PRIMARY_KEY = object()
-REMOVE_KEY = object()
+class Sentinal:
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return f"<Sentinal: {self.name!r}>"
+
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memodict={}):
+        memodict[id(self)] = self
+        return self
+
+
+PRIMARY_KEY = Sentinal("Primary Key")
+REMOVE_KEY = Sentinal("Remove Key")
+MISSING_KEY = Sentinal("Missing Key")
 
 
 class DoesNotExist(Exception):
     pass
 
 
-class Table:
-    def __init__(self, table_name, **kwargs):
+def itemdict(item) -> ty.Dict:
+    if isinstance(item, dict):
+        d = item
+    elif hasattr(item, "asdict"):
+        d = item.asdict()
+    else:
+        d = dataclasses.asdict(item)
+    return {k: v for (k, v) in d.items() if v is not MISSING_KEY}
+
+
+T = ty.TypeVar("T")
+
+
+class Table(ty.Generic[T]):
+    def __init__(self, table_name: str, item_type: ty.Type[T] = dict, **kwargs):
         dynamodb = boto3.resource("dynamodb", **kwargs)
+        self.item_type = item_type
         self.table = dynamodb.Table(table_name)
         self.DoesNotExist = type(f"DoesNotExist", (DoesNotExist,), {})
 
@@ -29,7 +60,7 @@ class Table:
     def __str__(self):
         return f"{self.table.name} ({self.table.creation_date_time:%Y-%m-%d}, {self.table.item_count} items)"
 
-    def get(self, **kwargs):
+    def get(self, **kwargs) -> T:
         dynamo_key = {}
         for k in self.table.key_schema:
             if k["AttributeName"] not in kwargs:
@@ -45,13 +76,13 @@ class Table:
         item = self.table.get_item(Key=dynamo_key).get("Item")
         if not item:
             raise self.DoesNotExist(dynamo_key)
+        return self.item_type(**item)
+
+    def put(self, item: T) -> T:
+        self.table.put_item(Item=itemdict(item))
         return item
 
-    def put(self, item):
-        self.table.put_item(Item=item)
-        return item
-
-    def update(self, update, return_values="ALL_NEW"):
+    def update(self, update: dict, return_values: str = "ALL_NEW") -> ty.Union[T, dict, None]:
         """
         Takes a table and a dictionary of updates, extracts the primary key from the
         update dict and applies the remaining keys as an update to the record.
@@ -59,7 +90,8 @@ class Table:
         Pass return_values="NONE" if you don't care what the resulting record is.
         """
         table = self.table
-        update = update.copy()
+        orig_update = update
+        update = itemdict(update).copy()
         pk = {}
         for k in table.key_schema:
             key = k["AttributeName"]
@@ -78,7 +110,13 @@ class Table:
         remove_parts = []
         for i, (key, val) in enumerate(update.items()):
             expression_attrs[f"#a{i}"] = key
-            if val is REMOVE_KEY:
+            if val is MISSING_KEY:
+                continue
+            elif val is REMOVE_KEY:
+                if isinstance(orig_update, dict):
+                    orig_update.pop(key)
+                else:
+                    setattr(orig_update, key, MISSING_KEY)
                 remove_parts.append(f"#a{i}")
             else:
                 expression_vals[f":v{i}"] = val
@@ -88,7 +126,7 @@ class Table:
         if set_parts:
             update_expression += "SET " + ", ".join(set_parts)
         if remove_parts:
-            update_expression += " REMOVE" + ", ".join(remove_parts)
+            update_expression += " REMOVE " + ", ".join(remove_parts)
 
         kwargs = {}
         if expression_attrs:
@@ -102,9 +140,12 @@ class Table:
             UpdateExpression=update_expression,
             **kwargs,
         )
-        return res.get("Attributes")
+        item = res.get("Attributes")
+        if return_values == "ALL_NEW":
+            item = self.item_type(**item)
+        return item
 
-    def find(self, *args, **kwargs):
+    def find(self, *args, **kwargs) -> ty.Generator[T, None, None]:
         # if the first arg is a string, it's the name of the index to use
         index_name = None
         if args and (args[0] is PRIMARY_KEY or isinstance(args[0], str)):
@@ -152,35 +193,47 @@ class Table:
 
         for page in paginator:
             for item in page["Items"]:
-                yield item
+                yield self.item_type(**item)
 
-    def clear(self, *args, **kwargs):
+    def clear(self, *args, **kwargs) -> None:
         with self.table.batch_writer() as batch:
             for item in self.find(*args, **kwargs):
+                item = itemdict(item)
                 batch.delete_item(Key={k["AttributeName"]: item[k["AttributeName"]] for k in self.table.key_schema})
+
+
+# Either (Hash key, type) or (hash key, hashkey type, range key, range key type)
+DynamesaIndexType = ty.Union[ty.Tuple[str, str], ty.Tuple[str, str, str, str]]
 
 
 class _TableGetter:
     _resource_kwargs = {}
-    _tables = {}
+    _tables: ty.Dict[ty.Tuple[str, ty.Type], Table] = {}
 
-    def configure(self, **kwargs):
+    def configure(self, **kwargs) -> None:
         self._resource_kwargs.update(kwargs)
 
     @property
     def dynamodb(self):
         return boto3.resource("dynamodb", **self._resource_kwargs)
 
-    def reload(self):
+    def reload(self) -> None:
         res = self.dynamodb.meta.client.list_tables()
         self._tables = {}
         for tablename in res["TableNames"]:
-            self._tables[tablename] = Table(tablename, **self._resource_kwargs)
+            self._tables[tablename, dict] = Table(tablename, **self._resource_kwargs)
 
-    def create(self, table_name, pk, gsis={}, lsis={}) -> Table:
+    def create(
+        self,
+        table_name: str,
+        pk: DynamesaIndexType,
+        gsis: ty.Dict[str, DynamesaIndexType] = {},
+        lsis: ty.Dict[str, DynamesaIndexType] = {},
+        item_type: ty.Type[T] = dict,
+    ) -> Table[T]:
         attribute_types = {}
 
-        def parse_index(idx):
+        def parse_index(idx: DynamesaIndexType) -> ty.List[ty.Dict[str, str]]:
             assert len(idx) % 2 == 0
             key_types = ("HASH", "RANGE")
             index = []
@@ -221,17 +274,25 @@ class _TableGetter:
             **create_kwargs,
         )
         table.meta.client.get_waiter("table_exists").wait(TableName=table_name)
-        return self[table_name]
+        return self.get(table_name, item_type)
 
-    def __getattr__(self, item) -> Table:
-        return self[item]
-
-    def __getitem__(self, item) -> Table:
-        if item not in self._tables:
+    def get(self, table_name, item_type: T = dict) -> Table[T]:
+        if (table_name, dict) not in self._tables:
             self.reload()
-        return self._tables[item]
+        if (table_name, item_type) in self._tables:
+            return self._tables[table_name, item_type]
 
-    def __iter__(self) -> Iterator[Table]:
+        table = Table(table_name, item_type=item_type, **self._resource_kwargs)
+        self._tables[table_name, item_type] = table
+        return table
+
+    def __getattr__(self, table_name) -> Table:
+        return self.get(table_name)
+
+    def __getitem__(self, table_name) -> Table:
+        return self.get(table_name)
+
+    def __iter__(self) -> ty.Iterator[Table]:
         if not self._tables:
             self.reload()
         return iter(self._tables.values())
