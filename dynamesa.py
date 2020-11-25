@@ -4,10 +4,10 @@ import operator
 from itertools import zip_longest
 import typing as ty
 
-import boto3
+import boto3  # type: ignore
 
 # for easy access
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Key, Attr  # type: ignore
 
 # sentinal values
 class Sentinal:
@@ -44,13 +44,13 @@ def itemdict(item) -> ty.Dict:
     return {k: v for (k, v) in d.items() if v is not MISSING_KEY}
 
 
-T = ty.TypeVar("T")
+T = ty.TypeVar("T", ty.Dict[str, ty.Any], ty.Any)
 
 
 class Table(ty.Generic[T]):
     def __init__(self, table_name: str, item_type: ty.Type[T] = dict, **kwargs):
         dynamodb = boto3.resource("dynamodb", **kwargs)
-        self.item_type = item_type
+        self.item_type: ty.Type[T] = item_type
         self.table = dynamodb.Table(table_name)
         self.DoesNotExist = type(f"DoesNotExist", (DoesNotExist,), {})
 
@@ -207,7 +207,7 @@ DynamesaIndexType = ty.Union[ty.Tuple[str, str], ty.Tuple[str, str, str, str]]
 
 
 class _TableGetter:
-    _resource_kwargs = {}
+    _resource_kwargs: ty.Dict[str, ty.Any] = {}
     _tables: ty.Dict[ty.Tuple[str, ty.Type], Table] = {}
 
     def configure(self, **kwargs) -> None:
@@ -233,7 +233,7 @@ class _TableGetter:
     ) -> Table[T]:
         attribute_types = {}
 
-        def parse_index(idx: DynamesaIndexType) -> ty.List[ty.Dict[str, str]]:
+        def parse_index(idx: DynamesaIndexType) -> ty.List[ty.Dict[str, ty.Any]]:
             assert len(idx) % 2 == 0
             key_types = ("HASH", "RANGE")
             index = []
@@ -276,7 +276,7 @@ class _TableGetter:
         table.meta.client.get_waiter("table_exists").wait(TableName=table_name)
         return self.get(table_name, item_type)
 
-    def get(self, table_name, item_type: T = dict) -> Table[T]:
+    def get(self, table_name: str, item_type: ty.Type[T] = dict) -> Table[T]:
         if (table_name, dict) not in self._tables:
             self.reload()
         if (table_name, item_type) in self._tables:
