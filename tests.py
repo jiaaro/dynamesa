@@ -39,7 +39,10 @@ class DynamoTests(unittest.TestCase):
                 subprocess.call(delete_container, stderr=subprocess.DEVNULL)
                 subprocess.call(run_container, stderr=subprocess.DEVNULL)
         except:
-            subprocess.call(run_container, stderr=subprocess.DEVNULL)
+            try:
+                subprocess.call(run_container, stderr=subprocess.DEVNULL)
+            except:
+                pass
 
         try:
             dynamesa.tables.User.table.delete()
