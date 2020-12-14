@@ -12,7 +12,7 @@ For now install from the repo. If `boto3` isn't already available in your python
 pip install -U git+https://github.com/jiaaro/dynamesa.git#egg=dynamesa
 ```
 
-### Sample code
+### Finding tables
 
 ```python
 import dynamesa
@@ -26,8 +26,23 @@ table = dynamesa.tables.MyAppUsers
 # allows for weird table names
 table = dynamesa.tables["My-App-Users"]
 
+# Get Tables with a dataclass to get back items as instances instead of dictionaries 
+table = dynamesa.tables.get("My-App-Users", MyDataClass)
+
 # You can also instantiate a table yourself (requires it's own configuration)
 table = dynamesa.Table("myapp-users", region_name="us-east-1")
+```
+
+### Example use
+
+```python
+import dynamesa
+
+table = dynamesa.tables.create(
+    "User",
+    ("id", "S", "ts", "N"),
+    gsis={"AgeIndex": ("age", "N")},
+)
 
 table.put({"id": 1, "name": "Jack Frost", "age": "I'll never tell"})
 table.get(id=1)
@@ -52,6 +67,37 @@ table.find(dynamesa.PRIMARY_KEY, dynamesa.Key("id").eq(1))
 # will scan (returns iterator)
 table.find(email="jfrost@northpole.io")
 
+# delete users who are 74 years old (using the age index)
+table.clear("UserAgeIndex", age=74)
+
 # delete everything
 table.clear()
+```
+
+### Example with Typed items
+
+```python
+import dataclasses
+import time
+import dynamesa
+
+
+@dataclasses.dataclass
+class UserModel:
+    id: str
+    name: str
+    email: str
+    age: int = None
+
+dynamesa.tables.create(
+    "User",
+    ("id", "S", "ts", "N"),
+    gsis={"AgeIndex": ("age", "N")},
+)
+table = dynamesa.tables.get('User', UserModel)
+jack = UserModel(1, "Jack Frost", "jfrost@northpole.net")
+table.put(jack)
+
+user = table.get(id=1)
+user.name == "Jack Frost"
 ```
