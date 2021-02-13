@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="dynamesa",
-    version="0.0.1",
+    version="0.0.2",
     py_modules=["dynamesa"],
     test_modules=["tests"],
     test_suite="tests",

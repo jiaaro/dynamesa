@@ -1,6 +1,7 @@
 import dataclasses
 import functools
 import operator
+import unittest
 from itertools import zip_longest
 import typing as ty
 
@@ -10,6 +11,9 @@ import boto3  # type: ignore
 from boto3.dynamodb.conditions import Key, Attr  # type: ignore
 
 # sentinal values
+from botocore.exceptions import ClientError
+
+
 class Sentinal:
     def __init__(self, name):
         self.name = name
@@ -209,6 +213,7 @@ DynamesaIndexType = ty.Union[ty.Tuple[str, str], ty.Tuple[str, str, str, str]]
 class _TableGetter:
     _resource_kwargs: ty.Dict[str, ty.Any] = {}
     _tables: ty.Dict[ty.Tuple[str, ty.Type], Table] = {}
+    table_name_prefix: str = ""
 
     def configure(self, **kwargs) -> None:
         self._resource_kwargs.update(kwargs)
@@ -231,6 +236,7 @@ class _TableGetter:
         lsis: ty.Dict[str, DynamesaIndexType] = {},
         item_type: ty.Type[T] = dict,
     ) -> Table[T]:
+        prefixed_table_name = f"{self.table_name_prefix}{table_name}"
         attribute_types = {}
 
         def parse_index(idx: DynamesaIndexType) -> ty.List[ty.Dict[str, ty.Any]]:
@@ -268,15 +274,28 @@ class _TableGetter:
             )
 
         table = self.dynamodb.create_table(
-            TableName=table_name,
+            TableName=prefixed_table_name,
             AttributeDefinitions=[{"AttributeName": k, "AttributeType": t} for k, t in attribute_types.items()],
             ProvisionedThroughput={"ReadCapacityUnits": 10, "WriteCapacityUnits": 10},
             **create_kwargs,
         )
-        table.meta.client.get_waiter("table_exists").wait(TableName=table_name)
+        table.meta.client.get_waiter("table_exists").wait(TableName=prefixed_table_name)
         return self.get(table_name, item_type)
 
+    def delete(self, table_name):
+        if isinstance(table_name, Table):
+            prefixed_table_name = table_name.table.name
+        else:
+            prefixed_table_name = f"{self.table_name_prefix}{table_name}"
+
+        self.dynamodb.meta.client.delete_table(TableName=prefixed_table_name)
+        self.dynamodb.meta.client.get_waiter("table_not_exists").wait(TableName=prefixed_table_name)
+        for table_key in list(self._tables.keys()):
+            if table_key[0] == prefixed_table_name:
+                self._tables.pop(table_key)
+
     def get(self, table_name: str, item_type: ty.Type[T] = dict) -> Table[T]:
+        table_name = f"{self.table_name_prefix}{table_name}"
         if (table_name, dict) not in self._tables:
             self.reload()
         if (table_name, item_type) in self._tables:
@@ -287,7 +306,8 @@ class _TableGetter:
         return table
 
     def __getattr__(self, table_name) -> Table:
-        return self.get(table_name)
+        if not table_name.startswith("__"):
+            return self.get(table_name)
 
     def __getitem__(self, table_name) -> Table:
         return self.get(table_name)
@@ -295,7 +315,12 @@ class _TableGetter:
     def __iter__(self) -> ty.Iterator[Table]:
         if not self._tables:
             self.reload()
-        return iter(self._tables.values())
+        return iter(t for t in self._tables.values() if t.table.name.startswith(self.table_name_prefix))
+
+    def __len__(self):
+        if not self._tables:
+            self.reload()
+        return len(self._tables)
 
     def __repr__(self):
         max_table_name_len = max(len(t.table.name) for t in self)
@@ -307,3 +332,77 @@ class _TableGetter:
 
 tables = _TableGetter()
 configure = tables.configure
+
+
+class DynamoUnitTestMixin(unittest.TestCase):
+    dynamesa_table_name_prefix: str = ""
+    dynamesa_tables = []
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        global tables, configure
+
+        if hasattr(cls, "dynamesa_configure"):
+            cls._old_table_getter = tables
+            cls.tables = _TableGetter()
+            cls.tables.configure(**cls.dynamesa_configure)
+            tables = cls.tables
+            configure = tables.configure
+        else:
+            cls._old_table_getter = tables
+            cls.tables = tables
+
+        if not hasattr(cls, "_old_dynamesa_table_name_prefix"):
+            cls._old_dynamesa_table_name_prefix = tables.table_name_prefix
+
+        tables.table_name_prefix = cls.dynamesa_table_name_prefix
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        global tables, configure
+        super().tearDownClass()
+        tables.dynamesa_table_name_prefix = cls._old_dynamesa_table_name_prefix
+        tables = cls._old_table_getter
+        configure = tables.configure
+
+    def setUp(self) -> None:
+        should_replace = None
+
+        def mktable(table):
+            if isinstance(table, (list, tuple)):
+                tables.create(*table)
+            elif isinstance(table, dict):
+                tables.create(**table)
+
+        for table in self.dynamesa_tables:
+            try:
+                mktable(table)
+            except ClientError as e:
+                if e.response["Error"]["Code"] != "ResourceInUseException":
+                    raise
+
+                if should_replace is None:
+                    replace_answer = input(
+                        "Couldn't create tables. Would you like to delete existing tables and replace them? [yN]"
+                    )
+                    should_replace = replace_answer.lower() == "y"
+                if not should_replace:
+                    raise
+
+                try:
+                    table_name = table[0]
+                except (KeyError, IndexError, TypeError):
+                    table_name = table.get("table_name")
+                tables.delete(table_name)
+                mktable(table)
+
+        if should_replace:
+            tables.reload()
+
+        super().setUp()
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        for table in tables:
+            table.table.delete()

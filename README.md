@@ -61,6 +61,9 @@ table.clear("UserAgeIndex", age=74)
 
 # delete everything
 table.clear()
+
+# drop the table by reference
+dynamesa.tables.delete(table)
 ```
 
 # Example with Typed items
@@ -89,4 +92,42 @@ table.put(jack)
 
 user = table.get(id=1)
 user.name == "Jack Frost"
+
+# drop the table by name
+dynamesa.tables.delete("User")
+```
+
+# Writing tests
+
+```python
+import unittest
+import dynamesa
+
+class TestMixinTests(dynamesa.DynamoUnitTestMixin, unittest.TestCase):
+    dynamesa_table_name_prefix = "myapp-testsuite-"
+    dynamesa_tables = [
+        ("User", ("id", "S", "ts", "N")),
+        {
+            "table_name": "Blog",
+            "pk": ("id", "S"),
+            "gsis": {"ByOwner": ("owner", "S")},
+        },
+    ]
+    dynamesa_configure = dict(
+        region_name="localhost",
+        endpoint_url="http://127.0.0.1:2808",
+        aws_access_key_id="AKLOCAL",
+        aws_secret_access_key="SKLOCAL",
+    )
+
+    def setUp(self) -> None:
+        super().setUp()  # dynamesa creates/resets your tables here
+        self.User = self.tables.get("User")
+
+    def test_tables_created_with_name_prefix(self):
+        self.assertEqual(self.User.table.name, "myapp-testsuite-User")
+
+    def test_only_prefixed_tables_are_visible(self):
+        # only tables with the name prefix are visible
+        self.assertEqual(len(dynamesa.tables), 1)
 ```

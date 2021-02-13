@@ -9,6 +9,24 @@ import dynamesa
 from dynamesa import Key, Attr, PRIMARY_KEY, REMOVE_KEY, MISSING_KEY
 
 
+def _start_dynamo_docker():
+    container_name = "dynamesa-test-db"
+    inspect_container = ["docker", "container", "inspect", container_name]
+    delete_container = ["docker", "container", "rm", container_name]
+    run_container = ["docker", "run", "-d", "--name", container_name, "-p2808:8000", "amazon/dynamodb-local"]
+    try:
+        result = subprocess.check_output(inspect_container, stderr=subprocess.DEVNULL)
+        container_info = json.loads(result)[0]
+        if not container_info["State"]["Running"]:
+            subprocess.call(delete_container, stderr=subprocess.DEVNULL)
+            subprocess.call(run_container, stderr=subprocess.DEVNULL)
+    except:
+        try:
+            subprocess.call(run_container, stderr=subprocess.DEVNULL)
+        except:
+            pass
+
+
 @dataclass
 class UserModel:
     id: str
@@ -21,29 +39,18 @@ class UserModel:
 
 
 class DynamoTests(unittest.TestCase):
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
+        _start_dynamo_docker()
         dynamesa.configure(
             region_name="localhost",
             endpoint_url=os.environ.get("DYNAMO_ENDPOINT", "http://127.0.0.1:2808"),
             aws_access_key_id="AKLOCAL",
             aws_secret_access_key="SKLOCAL",
         )
-        container_name = "dynamesa-test-db"
-        inspect_container = ["docker", "container", "inspect", container_name]
-        delete_container = ["docker", "container", "rm", container_name]
-        run_container = ["docker", "run", "-d", "--name", container_name, "-p2808:8000", "amazon/dynamodb-local"]
-        try:
-            result = subprocess.check_output(inspect_container, stderr=subprocess.DEVNULL)
-            container_info = json.loads(result)[0]
-            if not container_info["State"]["Running"]:
-                subprocess.call(delete_container, stderr=subprocess.DEVNULL)
-                subprocess.call(run_container, stderr=subprocess.DEVNULL)
-        except:
-            try:
-                subprocess.call(run_container, stderr=subprocess.DEVNULL)
-            except:
-                pass
+        super().setUpClass()
 
+    def setUp(self) -> None:
         try:
             dynamesa.tables.User.table.delete()
         except:
@@ -55,7 +62,7 @@ class DynamoTests(unittest.TestCase):
         )
 
     def tearDown(self):
-        dynamesa.tables.User.table.delete()
+        dynamesa.tables.delete(self.User)
 
     def assertFindResults(self, n, *findargs, **findkwargs):
         self.assertEqual(len(list(self.User.find(*findargs, **findkwargs))), n)
@@ -175,3 +182,48 @@ class DynamoTests(unittest.TestCase):
         # Wipe table
         User.clear()
         self.assertFindResults(0)
+
+
+class TestMixinTests(dynamesa.DynamoUnitTestMixin, unittest.TestCase):
+    dynamesa_table_name_prefix = "dynamounittests-"
+    dynamesa_tables = [
+        ("User", ("id", "S", "ts", "N")),
+        {
+            "table_name": "Blog",
+            "pk": ("id", "S"),
+            "gsis": {"ByOwner": ("owner", "S")},
+        },
+    ]
+    dynamesa_configure = dict(
+        region_name="localhost",
+        endpoint_url=os.environ.get("DYNAMO_ENDPOINT", "http://127.0.0.1:2808"),
+        aws_access_key_id="AKLOCAL",
+        aws_secret_access_key="SKLOCAL",
+    )
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        _start_dynamo_docker()
+        super().setUpClass()
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.User = self.tables.get("User")
+        self.Blog = self.tables.get("Blog")
+
+    def test_table_create_and_delete(self):
+        table_abc = self.tables.create("Abc", ("id", "S"))
+        table_xyz = self.tables.create("Xyz", ("id", "S"))
+
+        # delete by name
+        self.tables.delete("Abc")
+
+        # delete by reference
+        self.tables.delete(table_xyz)
+
+    def test_tables_created_with_name_prefix(self):
+        self.assertEqual(self.User.table.name, "dynamounittests-User")
+        self.assertEqual(self.Blog.table.name, "dynamounittests-Blog")
+
+    def test_only_prefixed_tables_are_visible(self):
+        self.assertEqual(len(dynamesa.tables), 2)
